@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['main.py'],
+    ['/Users/kamradsmeshnyavy/Downloads/labs-documents/Методы и средства криптографической защиты информации/practice/app/../app/main.py'],
     pathex=[],
     binaries=[],
     datas=[],

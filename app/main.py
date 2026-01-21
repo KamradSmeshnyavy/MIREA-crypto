@@ -103,7 +103,7 @@ def rail_fence_decode(cipher: str, rails: int) -> str:
     rail_chars = []
     idx = 0
     for c in counts:
-        rail_chars.append(list(cipher[idx: idx + c]))
+        rail_chars.append(list(cipher[idx : idx + c]))
         idx += c
     pointers = [0] * rails
     result = []
@@ -134,8 +134,7 @@ DEFAULT_BOOK_KEY = (
 
 def book_decode(coords: List[Tuple[int, int]], key_text: str = DEFAULT_BOOK_KEY) -> str:
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
-    words_by_line = [ln.replace(";", "").replace(
-        ":", "").split() for ln in lines]
+    words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     result = []
     for line_idx, word_idx in coords:
         try:
@@ -153,8 +152,7 @@ def book_find(
     if not word:
         return []
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
-    words_by_line = [ln.replace(";", "").replace(
-        ":", "").split() for ln in lines]
+    words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     hits: List[Tuple[int, int, str]] = []
     for i, line_words in enumerate(words_by_line, start=1):
         for j, w in enumerate(line_words, start=1):
@@ -166,11 +164,9 @@ def book_find(
 def book_encode(
     message: str, key_text: str = DEFAULT_BOOK_KEY
 ) -> List[Tuple[int, int]]:
-    words = [w for w in message.replace(
-        ";", " ").replace(":", " ").split() if w]
+    words = [w for w in message.replace(";", " ").replace(":", " ").split() if w]
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
-    words_by_line = [ln.replace(";", "").replace(
-        ":", "").split() for ln in lines]
+    words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     coords: List[Tuple[int, int]] = []
     for word in words:
         found = False
@@ -210,7 +206,7 @@ def richelieu_decode(cipher: str, key: str) -> str:
     idx = 0
     plain = []
     for cycle in cycles:
-        block = list(cipher[idx: idx + len(cycle)])
+        block = list(cipher[idx : idx + len(cycle)])
         idx += len(cycle)
         inv = [0] * len(cycle)
         for i, cpos in enumerate(cycle):
@@ -227,7 +223,7 @@ def richelieu_encode(plain: str, key: str) -> str:
     idx = 0
     cipher = []
     for cycle in cycles:
-        block = list(plain[idx: idx + len(cycle)])
+        block = list(plain[idx : idx + len(cycle)])
         idx += len(cycle)
         inv = [0] * len(cycle)
         for i, cpos in enumerate(cycle):
@@ -245,7 +241,7 @@ def hill_encrypt(text: str, matrix: List[List[int]], decrypt: bool = False) -> s
     size = 3
     while len(text) % size != 0:
         text += "Я"
-    blocks = [text[i: i + size] for i in range(0, len(text), size)]
+    blocks = [text[i : i + size] for i in range(0, len(text), size)]
     if decrypt:
         det = int(
             round(
@@ -410,8 +406,7 @@ class MainWindow(QWidget):
         content = QWidget()
         layout = QVBoxLayout()
 
-        book_box, book_layout = make_group(
-            "Книжный шифр (координаты line/word)")
+        book_box, book_layout = make_group("Книжный шифр (координаты line/word)")
         coords_entry = make_line(
             book_layout, "Координаты через запятую:", "2/8,1/4,2/1,2/3,3/5,3/8,3/3"
         )
@@ -422,8 +417,7 @@ class MainWindow(QWidget):
         find_entry = make_line(book_layout, "Слово для поиска:", "кот")
         out_find = make_text(book_layout, "Координаты слова", height=50)
         out_letters = make_text(book_layout, "Координаты букв", height=80)
-        encode_entry = make_line(
-            book_layout, "Сообщение для шифрования:", "кот учёный")
+        encode_entry = make_line(book_layout, "Сообщение для шифрования:", "кот учёный")
         out_encode = make_text(book_layout, "Координаты сообщения", height=50)
 
         def run_book():
@@ -445,8 +439,7 @@ class MainWindow(QWidget):
                 letters = []
                 for i, j, w in hits:
                     for k, ch in enumerate(w, start=1):
-                        letters.append(f"строка {i}, слово {
-                                       j}, буква {k}: {ch}")
+                        letters.append(f"строка {i}, слово {j}, буква {k}: {ch}")
                 out_letters.setPlainText("\n".join(letters))
 
         def run_book_encode():
@@ -472,8 +465,7 @@ class MainWindow(QWidget):
         book_layout.addWidget(btn_find)
 
         rail_box, rail_layout = make_group("Rail Fence (r=5)")
-        rail_entry = make_line(rail_layout, "Текст:",
-                               "аемаЯн_аю_изш_деанде.деол")
+        rail_entry = make_line(rail_layout, "Текст:", "аемаЯн_аю_изш_деанде.деол")
         r_entry = make_line(rail_layout, "Рельсы:", "5")
         out_rail = make_text(rail_layout, "Результат", height=60)
 
@@ -495,21 +487,30 @@ class MainWindow(QWidget):
         btn_rail_enc.clicked.connect(run_rail_enc)
         rail_layout.addWidget(btn_rail_enc)
 
-        caesar_box, caesar_layout = make_group("Цезарь (k=2)")
+        caesar_box, caesar_layout = make_group("Цезарь")
         caesar_entry = make_line(caesar_layout, "Текст:", "Мтксфретвцкб")
+        caesar_key = make_line(caesar_layout, "Ключ k:", "2")
         out_caesar = make_text(caesar_layout, "Результат", height=60)
 
         def run_caesar():
-            out_caesar.setPlainText(
-                caesar(caesar_entry.text(), 2, decrypt=True))
+            try:
+                k = int(caesar_key.text())
+            except ValueError:
+                out_caesar.setPlainText("Ошибка: ключ k должен быть целым")
+                return
+            out_caesar.setPlainText(caesar(caesar_entry.text(), k, decrypt=True))
 
         btn_caesar = QPushButton("Расшифровать")
         btn_caesar.clicked.connect(run_caesar)
         caesar_layout.addWidget(btn_caesar)
 
         def run_caesar_enc():
-            out_caesar.setPlainText(
-                caesar(caesar_entry.text(), 2, decrypt=False))
+            try:
+                k = int(caesar_key.text())
+            except ValueError:
+                out_caesar.setPlainText("Ошибка: ключ k должен быть целым")
+                return
+            out_caesar.setPlainText(caesar(caesar_entry.text(), k, decrypt=False))
 
         btn_caesar_enc = QPushButton("Зашифровать")
         btn_caesar_enc.clicked.connect(run_caesar_enc)
@@ -631,16 +632,14 @@ class MainWindow(QWidget):
         out_ric = make_text(ric_layout, "Результат", height=60)
 
         def run_ric():
-            out_ric.setPlainText(richelieu_decode(
-                ric_entry.text(), ric_key.text()))
+            out_ric.setPlainText(richelieu_decode(ric_entry.text(), ric_key.text()))
 
         btn_ric = QPushButton("Расшифровать")
         btn_ric.clicked.connect(run_ric)
         ric_layout.addWidget(btn_ric)
 
         def run_ric_enc():
-            out_ric.setPlainText(richelieu_encode(
-                ric_entry.text(), ric_key.text()))
+            out_ric.setPlainText(richelieu_encode(ric_entry.text(), ric_key.text()))
 
         btn_ric_enc = QPushButton("Зашифровать")
         btn_ric_enc.clicked.connect(run_ric_enc)
@@ -680,6 +679,7 @@ class MainWindow(QWidget):
             "-..-": "X",
             "-.--": "Y",
             "--..": "Z",
+            "..--..": "?",
             "/": " ",
             "...---...": "SOS",
         }
@@ -795,8 +795,7 @@ class MainWindow(QWidget):
             try:
                 c1 = int(c1_entry.text())
                 c2 = int(c2_entry.text())
-                m = elgamal_decrypt(c1, c2, int(
-                    p2_entry.text()), int(x_entry.text()))
+                m = elgamal_decrypt(c1, c2, int(p2_entry.text()), int(x_entry.text()))
                 out_elg.setPlainText(f"m={m}")
             except Exception as e:
                 out_elg.setPlainText(f"Ошибка: {e}")
