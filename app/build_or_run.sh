@@ -17,7 +17,7 @@ if [[ ! -f "$ENTRY" ]]; then
 fi
 
 echo "Выберите действие:"
-select action in "Запуск без сборки" "Сборка приложения" "Выход"; do
+select action in "Запуск без сборки" "Сборка приложения" "Запуск тестов" "Выход"; do
   case "$REPLY" in
   1)
     "$PYTHON" "$ENTRY"
@@ -83,6 +83,15 @@ select action in "Запуск без сборки" "Сборка приложе
     done
     ;;
   3)
+    if [[ ! -d "$PROJECT_ROOT/tests" ]]; then
+      echo "Каталог tests не найден: $PROJECT_ROOT/tests"
+      exit 1
+    fi
+    "$PYTHON" -m pip install --upgrade pytest
+    "$PYTHON" -m pytest "$PROJECT_ROOT/tests"
+    exit 0
+    ;;
+  4)
     exit 0
     ;;
   *)
