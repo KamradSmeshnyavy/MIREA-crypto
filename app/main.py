@@ -16,17 +16,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# === Общие утилиты ===
-
 RUS_ALPHABET = list("АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ")
 ALPHABET_INDEX = {ch: i for i, ch in enumerate(RUS_ALPHABET)}
 
 
 def normalize_rus(text: str) -> str:
     return "".join(ch.upper() for ch in text if ch.upper() in ALPHABET_INDEX)
-
-
-# === Шифр Цезаря ===
 
 
 def caesar(text: str, shift: int, decrypt: bool = True) -> str:
@@ -41,9 +36,6 @@ def caesar(text: str, shift: int, decrypt: bool = True) -> str:
     return "".join(result)
 
 
-# === Атбаш ===
-
-
 def atbash(text: str) -> str:
     text = normalize_rus(text)
     n = len(RUS_ALPHABET)
@@ -54,134 +46,84 @@ def atbash(text: str) -> str:
     return "".join(result)
 
 
-# === Аффинный шифр (a*x+b mod N) ===
-
-
 def modinv(a: int, m: int) -> int:
-    # расширенный алгоритм Евклида
     t, new_t = 0, 1
     r, new_r = m, a
     while new_r != 0:
         q = r // new_r
         t, new_t = new_t, t - q * new_t
         r, new_r = new_r, r - q * new_r
-            content = QWidget()
-            layout = QVBoxLayout()
+    if r != 1:
+        raise ValueError("Нет обратимого элемента")
+    if t < 0:
+        t += m
+    return t
 
-            # Book cipher
-            book_box, book_layout = make_group("Книжный шифр (координаты line/word)")
-            coords_entry = make_line(
-                book_layout, "Координаты через запятую:", "2/8,1/4,2/1,2/3,3/5,3/8,3/3"
-            )
-            key_text = make_text(
-                book_layout, "Текст-ключ", default=DEFAULT_BOOK_KEY, height=100
-            )
-            out_book = make_text(book_layout, "Результат", height=60)
-            find_entry = make_line(book_layout, "Слово для поиска:", "кот")
-            out_find = make_text(book_layout, "Координаты слова", height=50)
-            out_letters = make_text(book_layout, "Координаты букв", height=80)
-            encode_entry = make_line(book_layout, "Сообщение для шифрования:", "кот учёный")
-            out_encode = make_text(book_layout, "Координаты сообщения", height=50)
 
-            def run_book():
-                coords = []
-                for part in coords_entry.text().split(","):
-                    if "/" in part:
-                        a, b = part.strip().split("/")
-                        coords.append((int(a), int(b)))
-                out_book.setPlainText(book_decode(coords, key_text.toPlainText()))
+def affine(text: str, a: int, b: int, decrypt: bool = True) -> str:
+    text = normalize_rus(text)
+    m = len(RUS_ALPHABET)
+    res = []
+    if decrypt:
+        a_inv = modinv(a, m)
+        for ch in text:
+            y = ALPHABET_INDEX[ch]
+            x = (a_inv * (y - b)) % m
+            res.append(RUS_ALPHABET[x])
+    else:
+        for ch in text:
+            x = ALPHABET_INDEX[ch]
+            y = (a * x + b) % m
+            res.append(RUS_ALPHABET[y])
+    return "".join(res)
 
-            def run_find():
-                hits = book_find(find_entry.text(), key_text.toPlainText())
-                if not hits:
-                    out_find.setPlainText("Не найдено")
-                    out_letters.setPlainText("")
-                else:
-                    lines = [f"строка {i}, слово {j}: {w}" for i, j, w in hits]
-                    out_find.setPlainText("\n".join(lines))
-                    letters = []
-                    for i, j, w in hits:
-                        for k, ch in enumerate(w, start=1):
-                            letters.append(f"строка {i}, слово {j}, буква {k}: {ch}")
-                    out_letters.setPlainText("\n".join(letters))
 
-            def run_book_encode():
-                coords = book_encode(encode_entry.text(), key_text.toPlainText())
-                rendered = []
-                for a, b in coords:
-                    if a == -1:
-                        rendered.append("?")
-                    else:
-                        rendered.append(f"{a}/{b}")
-                out_encode.setPlainText(", ".join(rendered))
+def vigenere(text: str, key: str, decrypt: bool = True) -> str:
+    text = normalize_rus(text)
+    key = normalize_rus(key)
+    if not key:
+        return ""
+    res = []
+    m = len(RUS_ALPHABET)
+    for i, ch in enumerate(text):
+        k = ALPHABET_INDEX[key[i % len(key)]]
+        shift = -k if decrypt else k
+        idx = (ALPHABET_INDEX[ch] + shift) % m
+        res.append(RUS_ALPHABET[idx])
+    return "".join(res)
 
-            btn_book = QPushButton("Расшифровать")
-            btn_book.clicked.connect(run_book)
-            book_layout.addWidget(btn_book)
 
-            btn_book_enc = QPushButton("Зашифровать")
-            btn_book_enc.clicked.connect(run_book_encode)
-            book_layout.addWidget(btn_book_enc)
+def rail_fence_decode(cipher: str, rails: int) -> str:
+    if rails < 2:
+        return cipher
+    pattern = list(range(rails)) + list(range(rails - 2, 0, -1))
+    pattern_len = len(pattern)
+    positions = [pattern[i % pattern_len] for i in range(len(cipher))]
+    counts = [positions.count(r) for r in range(rails)]
+    rail_chars = []
+    idx = 0
+    for c in counts:
+        rail_chars.append(list(cipher[idx : idx + c]))
+        idx += c
+    pointers = [0] * rails
+    result = []
+    for pos in positions:
+        result.append(rail_chars[pos][pointers[pos]])
+        pointers[pos] += 1
+    return "".join(result)
 
-            btn_find = QPushButton("Найти слово")
-            btn_find.clicked.connect(run_find)
-            book_layout.addWidget(btn_find)
 
-            # Rail fence
-            rail_box, rail_layout = make_group("Rail Fence (r=5)")
-            rail_entry = make_line(rail_layout, "Текст:", "аемаЯн_аю_изш_деанде.деол")
-            r_entry = make_line(rail_layout, "Рельсы:", "5")
-            out_rail = make_text(rail_layout, "Результат", height=60)
+def rail_fence_encode(text: str, rails: int) -> str:
+    if rails < 2:
+        return text
+    pattern = list(range(rails)) + list(range(rails - 2, 0, -1))
+    pattern_len = len(pattern)
+    rows = [[] for _ in range(rails)]
+    for i, ch in enumerate(text):
+        rows[pattern[i % pattern_len]].append(ch)
+    return "".join("".join(r) for r in rows)
 
-            def run_rail():
-                out_rail.setPlainText(
-                    rail_fence_decode(rail_entry.text(), int(r_entry.text() or 2))
-                )
 
-            btn_rail_dec = QPushButton("Расшифровать")
-            btn_rail_dec.clicked.connect(run_rail)
-            rail_layout.addWidget(btn_rail_dec)
-
-            def run_rail_enc():
-                out_rail.setPlainText(
-                    rail_fence_encode(rail_entry.text(), int(r_entry.text() or 2))
-                )
-
-            btn_rail_enc = QPushButton("Зашифровать")
-            btn_rail_enc.clicked.connect(run_rail_enc)
-            rail_layout.addWidget(btn_rail_enc)
-
-            # Caesar
-            caesar_box, caesar_layout = make_group("Цезарь (k=2)")
-            caesar_entry = make_line(caesar_layout, "Текст:", "Мтксфретвцкб")
-            out_caesar = make_text(caesar_layout, "Результат", height=60)
-
-            def run_caesar():
-                out_caesar.setPlainText(caesar(caesar_entry.text(), 2, decrypt=True))
-
-            btn_caesar = QPushButton("Расшифровать")
-            btn_caesar.clicked.connect(run_caesar)
-            caesar_layout.addWidget(btn_caesar)
-
-            def run_caesar_enc():
-                out_caesar.setPlainText(caesar(caesar_entry.text(), 2, decrypt=False))
-
-            btn_caesar_enc = QPushButton("Зашифровать")
-            btn_caesar_enc.clicked.connect(run_caesar_enc)
-            caesar_layout.addWidget(btn_caesar_enc)
-
-            layout.addWidget(book_box)
-            layout.addWidget(rail_box)
-            layout.addWidget(caesar_box)
-            layout.addStretch(1)
-            content.setLayout(layout)
-
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setWidget(content)
-            return scroll
-
-# === Книжный шифр (номер строки/слова) ===
 DEFAULT_BOOK_KEY = (
     "У лукоморья дуб зелёный;\n"
     "Златая цепь на дубе том:\n"
@@ -192,8 +134,7 @@ DEFAULT_BOOK_KEY = (
 
 def book_decode(coords: List[Tuple[int, int]], key_text: str = DEFAULT_BOOK_KEY) -> str:
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
-    words_by_line = [ln.replace(";", "").replace(
-        ":", "").split() for ln in lines]
+    words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     result = []
     for line_idx, word_idx in coords:
         try:
@@ -211,8 +152,7 @@ def book_find(
     if not word:
         return []
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
-    words_by_line = [ln.replace(";", "").replace(
-        ":", "").split() for ln in lines]
+    words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     hits: List[Tuple[int, int, str]] = []
     for i, line_words in enumerate(words_by_line, start=1):
         for j, w in enumerate(line_words, start=1):
@@ -221,13 +161,16 @@ def book_find(
     return hits
 
 
-def book_encode(message: str, key_text: str = DEFAULT_BOOK_KEY) -> List[Tuple[int, int]]:
+def book_encode(
+    message: str, key_text: str = DEFAULT_BOOK_KEY
+) -> List[Tuple[int, int]]:
     words = [w for w in message.replace(";", " ").replace(":", " ").split() if w]
     lines = [ln.strip() for ln in key_text.split("\n") if ln.strip()]
     words_by_line = [ln.replace(";", "").replace(":", "").split() for ln in lines]
     coords: List[Tuple[int, int]] = []
     for word in words:
         found = False
+
         for i, line_words in enumerate(words_by_line, start=1):
             for j, w in enumerate(line_words, start=1):
                 if w.lower() == word.lower():
@@ -239,9 +182,6 @@ def book_encode(message: str, key_text: str = DEFAULT_BOOK_KEY) -> List[Tuple[in
         if not found:
             coords.append((-1, -1))
     return coords
-
-
-# === Ришелье (перестановки для блоков) ===
 
 
 def parse_cycles(key: str) -> List[List[int]]:
@@ -266,9 +206,8 @@ def richelieu_decode(cipher: str, key: str) -> str:
     idx = 0
     plain = []
     for cycle in cycles:
-        block = list(cipher[idx: idx + len(cycle)])
+        block = list(cipher[idx : idx + len(cycle)])
         idx += len(cycle)
-        # обратная перестановка
         inv = [0] * len(cycle)
         for i, cpos in enumerate(cycle):
             inv[cpos - 1] = i
@@ -284,7 +223,7 @@ def richelieu_encode(plain: str, key: str) -> str:
     idx = 0
     cipher = []
     for cycle in cycles:
-        block = list(plain[idx: idx + len(cycle)])
+        block = list(plain[idx : idx + len(cycle)])
         idx += len(cycle)
         inv = [0] * len(cycle)
         for i, cpos in enumerate(cycle):
@@ -296,56 +235,33 @@ def richelieu_encode(plain: str, key: str) -> str:
     return "".join(cipher) + plain[idx:]
 
 
-# === Хилл 3x3 (пример) ===
-
-
 def hill_encrypt(text: str, matrix: List[List[int]], decrypt: bool = False) -> str:
     text = normalize_rus(text)
     n = len(RUS_ALPHABET)
     size = 3
-    # дополнение
     while len(text) % size != 0:
         text += "Я"
-    blocks = [text[i: i + size] for i in range(0, len(text), size)]
-        # ElGamal
-        elg_box, elg_layout = make_group("ElGamal (вариант 3)")
-        m_entry = make_line(elg_layout, "Сообщение m:", "6")
-        p2_entry = make_line(elg_layout, "p:", "13")
-        g2_entry = make_line(elg_layout, "g:", "2")
-        x_entry = make_line(elg_layout, "x (секрет):", "7")
-        k_entry = make_line(elg_layout, "k (сеанс):", "10")
-        c1_entry = make_line(elg_layout, "c1:", "")
-        c2_entry = make_line(elg_layout, "c2:", "")
-        out_elg = make_text(elg_layout, "Результат", height=60)
-
-        def run_elg_enc():
-            c1, c2 = elgamal_encrypt(
-                int(m_entry.text()),
-                int(p2_entry.text()),
-                int(g2_entry.text()),
-                int(x_entry.text()),
-                int(k_entry.text()),
+    blocks = [text[i : i + size] for i in range(0, len(text), size)]
+    if decrypt:
+        det = int(
+            round(
+                matrix[0][0]
+                * (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1])
+                - matrix[0][1]
+                * (matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0])
+                + matrix[0][2]
+                * (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0])
             )
-            out_elg.setPlainText(f"c1={c1}, c2={c2}")
-            c1_entry.setText(str(c1))
-            c2_entry.setText(str(c2))
-
-        def run_elg_dec():
-            try:
-                c1 = int(c1_entry.text())
-                c2 = int(c2_entry.text())
-                m = elgamal_decrypt(c1, c2, int(p2_entry.text()), int(x_entry.text()))
-                out_elg.setPlainText(f"m={m}")
-            except Exception as e:
-                out_elg.setPlainText(f"Ошибка: {e}")
-
-        btn_elg_enc = QPushButton("Зашифровать")
-        btn_elg_enc.clicked.connect(run_elg_enc)
-        elg_layout.addWidget(btn_elg_enc)
-
-        btn_elg_dec = QPushButton("Расшифровать")
-        btn_elg_dec.clicked.connect(run_elg_dec)
-        elg_layout.addWidget(btn_elg_dec)
+        )
+        det_inv = modinv(det % n, n)
+        adj = [
+            [
+                (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]),
+                -(matrix[0][1] * matrix[2][2] - matrix[0][2] * matrix[2][1]),
+                (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1]),
+            ],
+            [
+                -(matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]),
                 (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]),
                 -(matrix[0][0] * matrix[1][2] - matrix[0][2] * matrix[1][0]),
             ],
@@ -355,7 +271,6 @@ def hill_encrypt(text: str, matrix: List[List[int]], decrypt: bool = False) -> s
                 (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]),
             ],
         ]
-        # транспонируем и умножаем на det_inv
         inv_m = []
         for r in range(size):
             row = []
@@ -373,9 +288,6 @@ def hill_encrypt(text: str, matrix: List[List[int]], decrypt: bool = False) -> s
     return "".join(res)
 
 
-# === Feistel (игровая модель) ===
-
-
 def feistel_round(left: int, right: int, subkey: int) -> Tuple[int, int]:
     f = right ^ subkey
     new_left = right
@@ -386,25 +298,21 @@ def feistel_round(left: int, right: int, subkey: int) -> Tuple[int, int]:
 def feistel_encrypt(values: List[int], keys: List[int], rounds: int = 2) -> List[int]:
     if len(values) != 2:
         raise ValueError("Требуются два числа")
-    l, r = values
+    left, right = values
     for i in range(rounds):
-        l, r = feistel_round(l, r, keys[i % len(keys)])
-    return [l, r]
+        left, right = feistel_round(left, right, keys[i % len(keys)])
+    return [left, right]
 
 
 def feistel_decrypt(values: List[int], keys: List[int], rounds: int = 2) -> List[int]:
     if len(values) != 2:
         raise ValueError("Требуются два числа")
-    l, r = values
+    left, right = values
     for i in reversed(range(rounds)):
-        # обратный шаг
-        f = l ^ keys[i % len(keys)]
-        new_r = r ^ f
-        r, l = l, new_r
-    return [l, r]
-
-
-# === Диффи-Хеллман ===
+        f = left ^ keys[i % len(keys)]
+        new_right = right ^ f
+        right, left = left, new_right
+    return [left, right]
 
 
 def diffie_hellman(g: int, p: int, a: int, b: int) -> Tuple[int, int, int]:
@@ -412,14 +320,12 @@ def diffie_hellman(g: int, p: int, a: int, b: int) -> Tuple[int, int, int]:
     B = pow(g, b, p)
     K1 = pow(B, a, p)
     K2 = pow(A, b, p)
-    return A, B, K1 if K1 == K2 else None
-
-
-# === ElGamal (упрощённо) ===
+    if K1 != K2:
+        raise ValueError("Ключи не совпали")
+    return A, B, K1
 
 
 def elgamal_encrypt(m: int, p: int, g: int, x: int, k: int) -> Tuple[int, int]:
-    # y = g^x mod p (открытый ключ)
     y = pow(g, x, p)
     c1 = pow(g, k, p)
     c2 = (m * pow(y, k, p)) % p
@@ -429,11 +335,7 @@ def elgamal_encrypt(m: int, p: int, g: int, x: int, k: int) -> Tuple[int, int]:
 def elgamal_decrypt(c1: int, c2: int, p: int, x: int) -> int:
     s = pow(c1, x, p)
     s_inv = modinv(s, p)
-    m = (c2 * s_inv) % p
-    return m
-
-
-# === RC4 ===
+    return (c2 * s_inv) % p
 
 
 def rc4(key: bytes, data: bytes) -> bytes:
@@ -453,16 +355,12 @@ def rc4(key: bytes, data: bytes) -> bytes:
     return bytes(out)
 
 
-# === GUI helpers ===
-
-
 def make_line(layout: QVBoxLayout, label: str, default: str = "") -> QLineEdit:
     row = QHBoxLayout()
-    lbl = QLabel(label)
+    row.addWidget(QLabel(label))
     edit = QLineEdit()
     if default:
         edit.setText(default)
-    row.addWidget(lbl)
     row.addWidget(edit)
     layout.addLayout(row)
     return edit
@@ -504,14 +402,11 @@ class MainWindow(QWidget):
         root.addWidget(tabs)
         self.setLayout(root)
 
-    # --- Tabs ---
     def practice1_tab(self):
-        frame = QWidget()
+        content = QWidget()
         layout = QVBoxLayout()
 
-        # Book cipher
-        book_box, book_layout = make_group(
-            "Книжный шифр (координаты line/word)")
+        book_box, book_layout = make_group("Книжный шифр (координаты line/word)")
         coords_entry = make_line(
             book_layout, "Координаты через запятую:", "2/8,1/4,2/1,2/3,3/5,3/8,3/3"
         )
@@ -522,6 +417,8 @@ class MainWindow(QWidget):
         find_entry = make_line(book_layout, "Слово для поиска:", "кот")
         out_find = make_text(book_layout, "Координаты слова", height=50)
         out_letters = make_text(book_layout, "Координаты букв", height=80)
+        encode_entry = make_line(book_layout, "Сообщение для шифрования:", "кот учёный")
+        out_encode = make_text(book_layout, "Координаты сообщения", height=50)
 
         def run_book():
             coords = []
@@ -542,22 +439,33 @@ class MainWindow(QWidget):
                 letters = []
                 for i, j, w in hits:
                     for k, ch in enumerate(w, start=1):
-                        letters.append(f"строка {i}, слово {
-                                       j}, буква {k}: {ch}")
+                        letters.append(f"строка {i}, слово {j}, буква {k}: {ch}")
                 out_letters.setPlainText("\n".join(letters))
+
+        def run_book_encode():
+            coords = book_encode(encode_entry.text(), key_text.toPlainText())
+            rendered = []
+            for a, b in coords:
+                if a == -1:
+                    rendered.append("?")
+                else:
+                    rendered.append(f"{a}/{b}")
+            out_encode.setPlainText(", ".join(rendered))
 
         btn_book = QPushButton("Расшифровать")
         btn_book.clicked.connect(run_book)
         book_layout.addWidget(btn_book)
 
+        btn_book_enc = QPushButton("Зашифровать")
+        btn_book_enc.clicked.connect(run_book_encode)
+        book_layout.addWidget(btn_book_enc)
+
         btn_find = QPushButton("Найти слово")
         btn_find.clicked.connect(run_find)
         book_layout.addWidget(btn_find)
 
-        # Rail fence
         rail_box, rail_layout = make_group("Rail Fence (r=5)")
-        rail_entry = make_line(rail_layout, "Шифртекст:",
-                               "аемаЯн_аю_изш_деанде.деол")
+        rail_entry = make_line(rail_layout, "Текст:", "аемаЯн_аю_изш_деанде.деол")
         r_entry = make_line(rail_layout, "Рельсы:", "5")
         out_rail = make_text(rail_layout, "Результат", height=60)
 
@@ -566,35 +474,52 @@ class MainWindow(QWidget):
                 rail_fence_decode(rail_entry.text(), int(r_entry.text() or 2))
             )
 
-        btn_rail = QPushButton("Расшифровать")
-        btn_rail.clicked.connect(run_rail)
-        rail_layout.addWidget(btn_rail)
+        btn_rail_dec = QPushButton("Расшифровать")
+        btn_rail_dec.clicked.connect(run_rail)
+        rail_layout.addWidget(btn_rail_dec)
 
-        # Caesar
-        caesar_box, caesar_layout = make_group("Цезарь (k=2, дешифрование)")
-        caesar_entry = make_line(caesar_layout, "Шифртекст:", "Мтксфретвцкб")
+        def run_rail_enc():
+            out_rail.setPlainText(
+                rail_fence_encode(rail_entry.text(), int(r_entry.text() or 2))
+            )
+
+        btn_rail_enc = QPushButton("Зашифровать")
+        btn_rail_enc.clicked.connect(run_rail_enc)
+        rail_layout.addWidget(btn_rail_enc)
+
+        caesar_box, caesar_layout = make_group("Цезарь (k=2)")
+        caesar_entry = make_line(caesar_layout, "Текст:", "Мтксфретвцкб")
         out_caesar = make_text(caesar_layout, "Результат", height=60)
 
         def run_caesar():
-            out_caesar.setPlainText(
-                caesar(caesar_entry.text(), 2, decrypt=True))
+            out_caesar.setPlainText(caesar(caesar_entry.text(), 2, decrypt=True))
 
         btn_caesar = QPushButton("Расшифровать")
         btn_caesar.clicked.connect(run_caesar)
         caesar_layout.addWidget(btn_caesar)
 
+        def run_caesar_enc():
+            out_caesar.setPlainText(caesar(caesar_entry.text(), 2, decrypt=False))
+
+        btn_caesar_enc = QPushButton("Зашифровать")
+        btn_caesar_enc.clicked.connect(run_caesar_enc)
+        caesar_layout.addWidget(btn_caesar_enc)
+
         layout.addWidget(book_box)
         layout.addWidget(rail_box)
         layout.addWidget(caesar_box)
         layout.addStretch(1)
-        frame.setLayout(layout)
-        return frame
+        content.setLayout(layout)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+        return scroll
 
     def practice2_tab(self):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Atbash
         atbash_box, atbash_layout = make_group("Атбаш")
         atbash_entry = make_line(atbash_layout, "Текст:", "Фоцпмрьоякца")
         out_atbash = make_text(atbash_layout, "Результат", height=60)
@@ -610,7 +535,6 @@ class MainWindow(QWidget):
         btn_atbash_enc.clicked.connect(run_atbash)
         atbash_layout.addWidget(btn_atbash_enc)
 
-        # Аффинный
         aff_box, aff_layout = make_group("Аффинный шифр")
         aff_entry = make_line(aff_layout, "Текст:", "КЖЗЬЖ")
         a_entry = make_line(aff_layout, "a:", "5")
@@ -659,7 +583,6 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Виженер
         vig_box, vig_layout = make_group("Виженер")
         vig_entry = make_line(vig_layout, "Текст:", "лудбйхще")
         vig_key = make_line(vig_layout, "Ключ:", "весна")
@@ -675,7 +598,9 @@ class MainWindow(QWidget):
         vig_layout.addWidget(btn_vig)
 
         def run_vig_enc():
-            out_vig.setPlainText(vigenere(vig_entry.text(), vig_key.text(), decrypt=False))
+            out_vig.setPlainText(
+                vigenere(vig_entry.text(), vig_key.text(), decrypt=False)
+            )
 
         btn_vig_enc = QPushButton("Зашифровать")
         btn_vig_enc.clicked.connect(run_vig_enc)
@@ -690,15 +615,13 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Ришелье
         ric_box, ric_layout = make_group("Ришелье (перестановка)")
         ric_entry = make_line(ric_layout, "Текст:", "_виг янк_е оан икр_")
         ric_key = make_line(ric_layout, "Ключ:", "(1342)(31542)(132)(3124)")
         out_ric = make_text(ric_layout, "Результат", height=60)
 
         def run_ric():
-            out_ric.setPlainText(richelieu_decode(
-                ric_entry.text(), ric_key.text()))
+            out_ric.setPlainText(richelieu_decode(ric_entry.text(), ric_key.text()))
 
         btn_ric = QPushButton("Расшифровать")
         btn_ric.clicked.connect(run_ric)
@@ -711,7 +634,6 @@ class MainWindow(QWidget):
         btn_ric_enc.clicked.connect(run_ric_enc)
         ric_layout.addWidget(btn_ric_enc)
 
-        # Морзе (простая декодировка)
         morse_box, morse_layout = make_group("Морзе")
         morse_entry = make_line(
             morse_layout,
@@ -749,7 +671,6 @@ class MainWindow(QWidget):
             "/": " ",
             "...---...": "SOS",
         }
-
         MORSE_REVERSE = {v: k for k, v in MORSE_DICT.items() if v != "/"}
 
         def run_morse():
@@ -785,7 +706,6 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Хилл
         hill_box, hill_layout = make_group("Шифр Хилла 3x3")
         hill_entry = make_line(hill_layout, "Текст:", "МИРЭА")
         hill_mat_entry = make_line(
@@ -817,7 +737,6 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Diffie-Hellman
         dh_box, dh_layout = make_group("Диффи-Хеллман (вариант 3)")
         g_entry = make_line(dh_layout, "g:", "11")
         p_entry = make_line(dh_layout, "p:", "3")
@@ -838,16 +757,17 @@ class MainWindow(QWidget):
         btn_dh.clicked.connect(run_dh)
         dh_layout.addWidget(btn_dh)
 
-        # ElGamal
         elg_box, elg_layout = make_group("ElGamal (вариант 3)")
         m_entry = make_line(elg_layout, "Сообщение m:", "6")
         p2_entry = make_line(elg_layout, "p:", "13")
         g2_entry = make_line(elg_layout, "g:", "2")
         x_entry = make_line(elg_layout, "x (секрет):", "7")
         k_entry = make_line(elg_layout, "k (сеанс):", "10")
-        out_elg = make_text(elg_layout, "c1, c2 и расшифровка", height=60)
+        c1_entry = make_line(elg_layout, "c1:", "")
+        c2_entry = make_line(elg_layout, "c2:", "")
+        out_elg = make_text(elg_layout, "Результат", height=60)
 
-        def run_elg():
+        def run_elg_enc():
             c1, c2 = elgamal_encrypt(
                 int(m_entry.text()),
                 int(p2_entry.text()),
@@ -855,13 +775,26 @@ class MainWindow(QWidget):
                 int(x_entry.text()),
                 int(k_entry.text()),
             )
-            dec = elgamal_decrypt(c1, c2, int(
-                p2_entry.text()), int(x_entry.text()))
-            out_elg.setPlainText(f"c1={c1}, c2={c2}, m={dec}")
+            out_elg.setPlainText(f"c1={c1}, c2={c2}")
+            c1_entry.setText(str(c1))
+            c2_entry.setText(str(c2))
 
-        btn_elg = QPushButton("Шифр/дешифр")
-        btn_elg.clicked.connect(run_elg)
-        elg_layout.addWidget(btn_elg)
+        def run_elg_dec():
+            try:
+                c1 = int(c1_entry.text())
+                c2 = int(c2_entry.text())
+                m = elgamal_decrypt(c1, c2, int(p2_entry.text()), int(x_entry.text()))
+                out_elg.setPlainText(f"m={m}")
+            except Exception as e:
+                out_elg.setPlainText(f"Ошибка: {e}")
+
+        btn_elg_enc = QPushButton("Зашифровать")
+        btn_elg_enc.clicked.connect(run_elg_enc)
+        elg_layout.addWidget(btn_elg_enc)
+
+        btn_elg_dec = QPushButton("Расшифровать")
+        btn_elg_dec.clicked.connect(run_elg_dec)
+        elg_layout.addWidget(btn_elg_dec)
 
         layout.addWidget(dh_box)
         layout.addWidget(elg_box)
@@ -873,7 +806,6 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # Feistel toy
         feis_box, feis_layout = make_group("Сеть Фейстеля (игровая)")
         l_entry = make_line(feis_layout, "L0:", "13")
         r_entry = make_line(feis_layout, "R0:", "1")
@@ -907,13 +839,12 @@ class MainWindow(QWidget):
         frame = QWidget()
         layout = QVBoxLayout()
 
-        # RC4
         rc_box, rc_layout = make_group("RC4")
         key_entry = make_line(rc_layout, "Ключ:", "КИИБ")
         data_entry = make_line(rc_layout, "Текст:", "ЗЗНГ_ЧЫ _ЗЫГНЧЗ")
         out_rc = make_text(rc_layout, "Результат", height=60)
 
-        def run_rc(decrypt=True):
+        def run_rc():
             key_bytes = key_entry.text().encode("utf-8")
             data_bytes = data_entry.text().encode("utf-8")
             res = rc4(key_bytes, data_bytes)
@@ -939,7 +870,6 @@ class MainWindow(QWidget):
 def main():
     import sys
 
-    # Ensure Qt finds platform plugins (cocoa on macOS)
     plugins_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)
     if plugins_path and not os.environ.get("QT_QPA_PLATFORM_PLUGIN_PATH"):
         os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = plugins_path
