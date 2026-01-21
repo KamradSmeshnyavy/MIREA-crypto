@@ -254,21 +254,24 @@ def hill_encrypt(text: str, matrix: List[List[int]], decrypt: bool = False) -> s
             )
         )
         det_inv = modinv(det % n, n)
+        a, b, c = matrix[0]
+        d, e, f = matrix[1]
+        g, h, i = matrix[2]
         adj = [
             [
-                (matrix[1][1] * matrix[2][2] - matrix[1][2] * matrix[2][1]),
-                -(matrix[0][1] * matrix[2][2] - matrix[0][2] * matrix[2][1]),
-                (matrix[0][1] * matrix[1][2] - matrix[0][2] * matrix[1][1]),
+                (e * i - f * h),
+                -(d * i - f * g),
+                (d * h - e * g),
             ],
             [
-                -(matrix[1][0] * matrix[2][2] - matrix[1][2] * matrix[2][0]),
-                (matrix[0][0] * matrix[2][2] - matrix[0][2] * matrix[2][0]),
-                -(matrix[0][0] * matrix[1][2] - matrix[0][2] * matrix[1][0]),
+                -(b * i - c * h),
+                (a * i - c * g),
+                -(a * h - b * g),
             ],
             [
-                (matrix[1][0] * matrix[2][1] - matrix[1][1] * matrix[2][0]),
-                -(matrix[0][0] * matrix[2][1] - matrix[0][1] * matrix[2][0]),
-                (matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]),
+                (b * f - c * e),
+                -(a * f - c * d),
+                (a * e - b * d),
             ],
         ]
         inv_m = []
