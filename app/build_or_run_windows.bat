@@ -7,15 +7,15 @@ if "%SCRIPT_DIR:~-1%"=="\" set "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 
 for %%I in ("%SCRIPT_DIR%\..") do set "PROJECT_ROOT=%%~fI"
 set "PYTHON=%PROJECT_ROOT%\.venv\Scripts\python.exe"
+set "VENV_DIR=%PROJECT_ROOT%\.venv"
 set "APP_DIR=%PROJECT_ROOT%\app"
 set "ENTRY=%APP_DIR%\main.py"
 set "TESTS_DIR=%PROJECT_ROOT%\tests"
+set "REQ_ROOT=%PROJECT_ROOT%\requirements.txt"
+set "REQ_APP=%APP_DIR%\requirements.txt"
 
-if not exist "%PYTHON%" (
-  echo Python venv not found: "%PYTHON%"
-  echo Сначала создайте окружение .venv и установите зависимости.
-  exit /b 1
-)
+call :ensure_venv_and_deps
+if errorlevel 1 exit /b 1
 
 if not exist "%ENTRY%" (
   echo Entry file not found: "%ENTRY%"
@@ -73,3 +73,55 @@ goto :end
 
 :end
 endlocal
+goto :eof
+
+:ensure_venv_and_deps
+if not exist "%PYTHON%" (
+  echo Python venv not found. Создаю окружение...
+
+  where py >nul 2>&1
+  if not errorlevel 1 (
+    py -3 -m venv "%VENV_DIR%"
+  ) else (
+    where python >nul 2>&1
+    if errorlevel 1 (
+      echo Не найден системный Python.
+      echo Установите Python 3 и добавьте его в PATH.
+      exit /b 1
+    )
+    python -m venv "%VENV_DIR%"
+  )
+
+  if errorlevel 1 (
+    echo Не удалось создать виртуальное окружение.
+    exit /b 1
+  )
+)
+
+if not exist "%PYTHON%" (
+  echo Python в venv не найден: "%PYTHON%"
+  exit /b 1
+)
+
+echo Обновляю pip...
+"%PYTHON%" -m pip install --upgrade pip
+if errorlevel 1 exit /b 1
+
+if exist "%REQ_ROOT%" (
+  echo Устанавливаю зависимости из "%REQ_ROOT%"...
+  "%PYTHON%" -m pip install -r "%REQ_ROOT%"
+  if errorlevel 1 exit /b 1
+  goto :eof
+)
+
+if exist "%REQ_APP%" (
+  echo Устанавливаю зависимости из "%REQ_APP%"...
+  "%PYTHON%" -m pip install -r "%REQ_APP%"
+  if errorlevel 1 exit /b 1
+  goto :eof
+)
+
+echo Файл requirements.txt не найден. Ставлю базовые зависимости...
+"%PYTHON%" -m pip install --upgrade PySide6 pytest
+if errorlevel 1 exit /b 1
+goto :eof
