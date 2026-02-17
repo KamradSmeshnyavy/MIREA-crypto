@@ -81,21 +81,17 @@ if not exist "%PYTHON%" (
   echo Python venv not found. Создаю окружение...
 
   call :resolve_python
-  if not defined SYS_PYTHON (
+  call :normalize_sys_python
+  if "%SYS_PYTHON%"=="" (
     echo Системный Python не найден. Пытаюсь установить автоматически...
     call :install_python
     if errorlevel 1 exit /b 1
     call :resolve_python
+    call :normalize_sys_python
   )
 
-  if not defined SYS_PYTHON (
+  if "%SYS_PYTHON%"=="" (
     echo Не удалось найти Python после установки.
-    exit /b 1
-  )
-
-  call :normalize_sys_python
-  if not defined SYS_PYTHON (
-    echo Найден некорректный путь к Python.
     exit /b 1
   )
 
@@ -140,21 +136,17 @@ set "SYS_PYTHON="
 
 where py >nul 2>&1
 if not errorlevel 1 (
-  for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do (
-    if exist "%%~P" set "SYS_PYTHON=%%~P"
-  )
+  for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do call :set_python_candidate "%%P"
 )
 
-if defined SYS_PYTHON goto :eof
+if not "%SYS_PYTHON%"=="" goto :eof
 
 where python >nul 2>&1
 if not errorlevel 1 (
-  for /f "usebackq delims=" %%P in (`python -c "import sys; print(sys.executable)" 2^>nul`) do (
-    if exist "%%~P" set "SYS_PYTHON=%%~P"
-  )
+  for /f "usebackq delims=" %%P in (`python -c "import sys; print(sys.executable)" 2^>nul`) do call :set_python_candidate "%%P"
 )
 
-if defined SYS_PYTHON goto :eof
+if not "%SYS_PYTHON%"=="" goto :eof
 
 if exist "%LocalAppData%\Programs\Python\Python312\python.exe" set "SYS_PYTHON=%LocalAppData%\Programs\Python\Python312\python.exe"
 if defined SYS_PYTHON goto :eof
@@ -165,9 +157,15 @@ if defined SYS_PYTHON goto :eof
 if exist "%ProgramFiles%\Python311\python.exe" set "SYS_PYTHON=%ProgramFiles%\Python311\python.exe"
 goto :eof
 
+:set_python_candidate
+set "CANDIDATE=%~1"
+if "%CANDIDATE%"=="" goto :eof
+if exist "%CANDIDATE%" set "SYS_PYTHON=%CANDIDATE%"
+goto :eof
+
 :normalize_sys_python
-set "SYS_PYTHON=%SYS_PYTHON:\=\%"
 set "SYS_PYTHON=%SYS_PYTHON:"=%"
+if "%SYS_PYTHON%"=="" set "SYS_PYTHON=" & goto :eof
 if not exist "%SYS_PYTHON%" set "SYS_PYTHON="
 goto :eof
 
