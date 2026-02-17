@@ -888,7 +888,13 @@ def main():
     plugins_path = QLibraryInfo.path(QLibraryInfo.LibraryPath.PluginsPath)
     if plugins_path and not os.environ.get("QT_QPA_PLATFORM_PLUGIN_PATH"):
         os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = plugins_path
-    os.environ.setdefault("QT_QPA_PLATFORM", "cocoa")
+    if not os.environ.get("QT_QPA_PLATFORM"):
+        if sys.platform == "darwin":
+            os.environ["QT_QPA_PLATFORM"] = "cocoa"
+        elif sys.platform.startswith("win"):
+            os.environ["QT_QPA_PLATFORM"] = "windows"
+        else:
+            os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
     qt_app = QApplication(sys.argv)
     window = MainWindow()
