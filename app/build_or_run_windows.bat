@@ -93,6 +93,12 @@ if not exist "%PYTHON%" (
     exit /b 1
   )
 
+  call :normalize_sys_python
+  if not defined SYS_PYTHON (
+    echo Найден некорректный путь к Python.
+    exit /b 1
+  )
+
   "%SYS_PYTHON%" -m venv "%VENV_DIR%"
 
   if errorlevel 1 (
@@ -134,14 +140,18 @@ set "SYS_PYTHON="
 
 where py >nul 2>&1
 if not errorlevel 1 (
-  for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do set "SYS_PYTHON=%%P"
+  for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do (
+    if exist "%%~P" set "SYS_PYTHON=%%~P"
+  )
 )
 
 if defined SYS_PYTHON goto :eof
 
 where python >nul 2>&1
 if not errorlevel 1 (
-  for /f "usebackq delims=" %%P in (`python -c "import sys; print(sys.executable)" 2^>nul`) do set "SYS_PYTHON=%%P"
+  for /f "usebackq delims=" %%P in (`python -c "import sys; print(sys.executable)" 2^>nul`) do (
+    if exist "%%~P" set "SYS_PYTHON=%%~P"
+  )
 )
 
 if defined SYS_PYTHON goto :eof
@@ -153,6 +163,12 @@ if defined SYS_PYTHON goto :eof
 if exist "%ProgramFiles%\Python312\python.exe" set "SYS_PYTHON=%ProgramFiles%\Python312\python.exe"
 if defined SYS_PYTHON goto :eof
 if exist "%ProgramFiles%\Python311\python.exe" set "SYS_PYTHON=%ProgramFiles%\Python311\python.exe"
+goto :eof
+
+:normalize_sys_python
+set "SYS_PYTHON=%SYS_PYTHON:\=\%"
+set "SYS_PYTHON=%SYS_PYTHON:"=%"
+if not exist "%SYS_PYTHON%" set "SYS_PYTHON="
 goto :eof
 
 :install_python
