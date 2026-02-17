@@ -85,11 +85,25 @@ if not exist "%PYTHON%" (
   ) else (
     where python >nul 2>&1
     if errorlevel 1 (
-      echo Не найден системный Python.
-      echo Установите Python 3 и добавьте его в PATH.
-      exit /b 1
+      echo Системный Python не найден. Пытаюсь установить автоматически...
+      call :install_python
+      if errorlevel 1 exit /b 1
+
+      where py >nul 2>&1
+      if not errorlevel 1 (
+        py -3 -m venv "%VENV_DIR%"
+      ) else (
+        where python >nul 2>&1
+        if errorlevel 1 (
+          echo Python всё ещё не найден в PATH после установки.
+          echo Закройте терминал, откройте новый cmd и запустите скрипт снова.
+          exit /b 1
+        )
+        python -m venv "%VENV_DIR%"
+      )
+    ) else (
+      python -m venv "%VENV_DIR%"
     )
-    python -m venv "%VENV_DIR%"
   )
 
   if errorlevel 1 (
@@ -124,4 +138,24 @@ if exist "%REQ_APP%" (
 echo Файл requirements.txt не найден. Ставлю базовые зависимости...
 "%PYTHON%" -m pip install --upgrade PySide6 pytest
 if errorlevel 1 exit /b 1
+goto :eof
+
+:install_python
+where winget >nul 2>&1
+if errorlevel 1 (
+  echo Не найден winget ^(App Installer^).
+  echo Установите Python вручную: https://www.python.org/downloads/windows/
+  exit /b 1
+)
+
+echo Устанавливаю Python 3 через winget...
+winget install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements --scope user
+if errorlevel 1 (
+  echo Не удалось установить Python автоматически через winget.
+  echo Попробуйте вручную: winget install --id Python.Python.3.12
+  echo Или установите с сайта: https://www.python.org/downloads/windows/
+  exit /b 1
+)
+
+echo Python установлен.
 goto :eof
