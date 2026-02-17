@@ -138,6 +138,18 @@ goto :eof
 :resolve_python
 set "SYS_PYTHON="
 
+if exist "%SystemRoot%\py.exe" (
+  for /f "usebackq delims=" %%P in (`"%SystemRoot%\py.exe" -3 -c "import sys; print(sys.executable)" 2^>nul`) do call :set_python_candidate "%%P"
+)
+
+if not "%SYS_PYTHON%"=="" goto :eof
+
+if exist "%LOCAL_APPDATA%\Programs\Python\Launcher\py.exe" (
+  for /f "usebackq delims=" %%P in (`"%LOCAL_APPDATA%\Programs\Python\Launcher\py.exe" -3 -c "import sys; print(sys.executable)" 2^>nul`) do call :set_python_candidate "%%P"
+)
+
+if not "%SYS_PYTHON%"=="" goto :eof
+
 where py >nul 2>&1
 if not errorlevel 1 (
   for /f "usebackq delims=" %%P in (`py -3 -c "import sys; print(sys.executable)" 2^>nul`) do call :set_python_candidate "%%P"
@@ -159,6 +171,8 @@ if defined SYS_PYTHON goto :eof
 if exist "%PROGRAM_FILES%\Python312\python.exe" set "SYS_PYTHON=%PROGRAM_FILES%\Python312\python.exe"
 if defined SYS_PYTHON goto :eof
 if exist "%PROGRAM_FILES%\Python311\python.exe" set "SYS_PYTHON=%PROGRAM_FILES%\Python311\python.exe"
+if defined SYS_PYTHON goto :eof
+if exist "%LOCAL_APPDATA%\Microsoft\WindowsApps\python.exe" set "SYS_PYTHON=%LOCAL_APPDATA%\Microsoft\WindowsApps\python.exe"
 if defined SYS_PYTHON goto :eof
 
 call :set_python_from_reg "HKCU\Software\Python\PythonCore\3.12\InstallPath"
@@ -202,12 +216,18 @@ where winget >nul 2>&1
 if not errorlevel 1 (
   echo Устанавливаю Python 3 через winget...
   winget install --id Python.Python.3.12 --exact --accept-package-agreements --accept-source-agreements --scope user
-  if not errorlevel 1 goto :eof
-  echo winget-установка не удалась, пробую direct installer...
+  if errorlevel 1 (
+    echo winget-установка не удалась, пробую direct installer...
+  ) else (
+    call :resolve_python
+    call :normalize_sys_python
+    if not "%SYS_PYTHON%"=="" goto :eof
+    echo Python через winget установлен, но не найден. Пробую direct installer...
+  )
 )
 
-set "PY_URL=https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe"
-set "PY_INSTALLER=%TEMP%\python-3.12.8-amd64.exe"
+set "PY_URL=https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe"
+set "PY_INSTALLER=%TEMP%\python-3.12.10-amd64.exe"
 
 where powershell >nul 2>&1
 if errorlevel 1 (
@@ -231,4 +251,6 @@ if errorlevel 1 (
 )
 
 echo Python установлен.
+call :resolve_python
+call :normalize_sys_python
 goto :eof
