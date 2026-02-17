@@ -14,6 +14,10 @@ set "TESTS_DIR=%PROJECT_ROOT%\tests"
 set "REQ_ROOT=%PROJECT_ROOT%\requirements.txt"
 set "REQ_APP=%APP_DIR%\requirements.txt"
 set "SYS_PYTHON="
+set "LOCAL_APPDATA=%LocalAppData%"
+if "%LOCAL_APPDATA%"=="" set "LOCAL_APPDATA=%USERPROFILE%\AppData\Local"
+set "PROGRAM_FILES=%ProgramFiles%"
+if "%PROGRAM_FILES%"=="" set "PROGRAM_FILES=C:\Program Files"
 
 call :ensure_venv_and_deps
 if errorlevel 1 exit /b 1
@@ -148,19 +152,43 @@ if not errorlevel 1 (
 
 if not "%SYS_PYTHON%"=="" goto :eof
 
-if exist "%LocalAppData%\Programs\Python\Python312\python.exe" set "SYS_PYTHON=%LocalAppData%\Programs\Python\Python312\python.exe"
+if exist "%LOCAL_APPDATA%\Programs\Python\Python312\python.exe" set "SYS_PYTHON=%LOCAL_APPDATA%\Programs\Python\Python312\python.exe"
 if defined SYS_PYTHON goto :eof
-if exist "%LocalAppData%\Programs\Python\Python311\python.exe" set "SYS_PYTHON=%LocalAppData%\Programs\Python\Python311\python.exe"
+if exist "%LOCAL_APPDATA%\Programs\Python\Python311\python.exe" set "SYS_PYTHON=%LOCAL_APPDATA%\Programs\Python\Python311\python.exe"
 if defined SYS_PYTHON goto :eof
-if exist "%ProgramFiles%\Python312\python.exe" set "SYS_PYTHON=%ProgramFiles%\Python312\python.exe"
+if exist "%PROGRAM_FILES%\Python312\python.exe" set "SYS_PYTHON=%PROGRAM_FILES%\Python312\python.exe"
 if defined SYS_PYTHON goto :eof
-if exist "%ProgramFiles%\Python311\python.exe" set "SYS_PYTHON=%ProgramFiles%\Python311\python.exe"
+if exist "%PROGRAM_FILES%\Python311\python.exe" set "SYS_PYTHON=%PROGRAM_FILES%\Python311\python.exe"
+if defined SYS_PYTHON goto :eof
+
+call :set_python_from_reg "HKCU\Software\Python\PythonCore\3.12\InstallPath"
+if defined SYS_PYTHON goto :eof
+call :set_python_from_reg "HKLM\Software\Python\PythonCore\3.12\InstallPath"
+if defined SYS_PYTHON goto :eof
+call :set_python_from_reg "HKCU\Software\Python\PythonCore\3.11\InstallPath"
+if defined SYS_PYTHON goto :eof
+call :set_python_from_reg "HKLM\Software\Python\PythonCore\3.11\InstallPath"
+if defined SYS_PYTHON goto :eof
+
+for /f "usebackq delims=" %%P in (`where /r "%LOCAL_APPDATA%\Programs\Python" python.exe 2^>nul`) do call :set_python_candidate "%%P"
+if defined SYS_PYTHON goto :eof
+for /f "usebackq delims=" %%P in (`where /r "%PROGRAM_FILES%" python.exe 2^>nul`) do call :set_python_candidate "%%P"
 goto :eof
 
 :set_python_candidate
 set "CANDIDATE=%~1"
 if "%CANDIDATE%"=="" goto :eof
 if exist "%CANDIDATE%" set "SYS_PYTHON=%CANDIDATE%"
+goto :eof
+
+:set_python_from_reg
+set "REG_KEY=%~1"
+set "REG_PATH="
+for /f "tokens=2,*" %%A in ('reg query "%REG_KEY%" /ve 2^>nul ^| find /i "REG_"') do set "REG_PATH=%%B"
+if "%REG_PATH%"=="" goto :eof
+set "REG_PATH=%REG_PATH:"=%"
+if exist "%REG_PATH%python.exe" set "SYS_PYTHON=%REG_PATH%python.exe"
+if exist "%REG_PATH%" if /i "%REG_PATH:~-10%"=="python.exe" set "SYS_PYTHON=%REG_PATH%"
 goto :eof
 
 :normalize_sys_python
